@@ -1,0 +1,36 @@
+Name:		qubes-core-admin-bridge-device
+Version:	@VERSION@
+Release:	1%{?dist}
+Summary:	qubes-core-admin extension for handling Bridge Device
+
+Group:		Qubes
+License:	GPLv2+
+URL:		https://www.qubes-os.org
+Source0:    %{name}-%{version}.tar.gz
+
+BuildArch:	noarch
+BuildRequires:	python%{python3_pkgversion}-devel
+
+%description
+qubes-core-admin extension for handling Bridge Device
+
+%prep
+%setup -q
+
+%build
+make %{?_smp_mflags}
+
+%install
+%make_install
+
+%files
+%doc README.md
+%{python3_sitelib}/qubesbridgedevice-*.egg-info
+%{python3_sitelib}/qubesbridgedevice
+
+%attr(2775,root,qubes) %dir /etc/qubes-rpc/policy
+%attr(0664,root,qubes) %config(noreplace) /etc/qubes-rpc/policy/admin.*
+/etc/qubes-rpc/admin.*
+
+%changelog
+
