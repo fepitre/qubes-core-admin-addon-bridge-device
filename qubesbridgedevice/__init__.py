@@ -26,6 +26,7 @@ import string
 import random
 import ipaddress
 import jinja2
+import asyncio
 
 name_re = re.compile(r"^[a-z0-9-]{1,12}$")
 
@@ -286,6 +287,28 @@ class BridgeDeviceExtension(qubes.ext.Extension):
         '''
 
         return jinja2.Environment().from_string(bridge_xml).render(device=device, options=options_ext)
+
+    @qubes.ext.handler('domain-pre-start')
+    @asyncio.coroutine
+    def on_domain_pre_start(self, vm, event, start_guid, **kwargs):
+        for bridge in vm.devices['bridge'].assignments():
+            try:
+                backenddomain = vm.app.domains[bridge.backend_domain.name]
+            except KeyError:
+                msg = "Cannot find backend domain '%s'" % bridge.backend_domain.name
+                vm.log.error(msg)
+
+            if backenddomain.qid != 0:
+                if not backenddomain.is_running():
+                    yield from backenddomain.start(start_guid=start_guid, notify_function=None)
+
+                wait_count = 0
+                vm.log.info("Waiting for {}:{} being available".format(bridge.backend_domain.name,bridge.ident))
+                while not self.device_get(backenddomain, bridge.ident):
+                    wait_count += 1
+                    if wait_count > 60:
+                        vm.log.error("Timeout while waiting for {} to be available".format(bridge.ident))
+                    yield from asyncio.sleep(0.1)
 
     @qubes.ext.handler('domain-start')
     def on_domain_start(self, vm, event, start_guid, **kwargs):
