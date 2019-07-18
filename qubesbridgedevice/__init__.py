@@ -202,7 +202,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             if 'gateway' in options:
                 vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/gateway', options['gateway'])
 
-            vm.libvirt_domain.attachDevice(self.generate_bridge_xml(device, options))
+        vm.libvirt_domain.attachDevice(self.generate_bridge_xml(device, options))
 
     @qubes.ext.handler('device-list-attached:bridge')
     def on_device_list_attached(self, vm, event, **kwargs):
@@ -236,15 +236,13 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             options['mac'] = mac
 
             ip_node = iface.find('ip')
-            if ip_node is None:
-                continue
-            ip = ip_node.get('address')
-            prefix = ip_node.get('prefix')
-            if not ip or not prefix:
-                continue
+            if ip_node is not None:
+                ip = ip_node.get('address')
+                prefix = ip_node.get('prefix')
 
-            options['ip'] = ip
-            options['netmask'] = get_netmask_from_prefix(prefix)
+                if ip and prefix:
+                    options['ip'] = ip
+                    options['netmask'] = get_netmask_from_prefix(prefix)
 
             route_node = iface.find('route')
             if route_node is not None:
@@ -268,8 +266,9 @@ class BridgeDeviceExtension(qubes.ext.Extension):
     @staticmethod
     def generate_bridge_xml(device, options):
         options_ext = dict(options)
-        options_ext['prefix'] = get_prefix_from_netmask(options['netmask'])
-        options_ext['subnet'] = get_subnet(options['ip'], options['netmask'])
+        if options.get('netmask', False):
+            options_ext['prefix'] = get_prefix_from_netmask(options['netmask'])
+            options_ext['subnet'] = get_subnet(options['ip'], options['netmask'])
 
         bridge_xml = '''
             <interface type="bridge">
