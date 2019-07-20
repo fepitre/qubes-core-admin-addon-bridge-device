@@ -287,6 +287,12 @@ class BridgeDeviceExtension(qubes.ext.Extension):
 
         return jinja2.Environment().from_string(bridge_xml).render(device=device, options=options_ext)
 
+    def attached_vms(self, vm):
+        for domain in vm.app.domains:
+            for attached_device, options in self.on_device_list_attached(domain, event=None):
+                if attached_device.backend_domain is vm:
+                    yield domain
+
     @qubes.ext.handler('domain-pre-start')
     @asyncio.coroutine
     def on_domain_pre_start(self, vm, event, start_guid, **kwargs):
@@ -302,7 +308,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
                     yield from backenddomain.start(start_guid=start_guid, notify_function=None)
 
                 wait_count = 0
-                vm.log.info("Waiting for {}:{} being available".format(bridge.backend_domain.name,bridge.ident))
+                vm.log.info("Waiting for {}:{} being available".format(bridge.backend_domain.name, bridge.ident))
                 while not self.device_get(backenddomain, bridge.ident):
                     wait_count += 1
                     if wait_count > 60:
@@ -313,3 +319,10 @@ class BridgeDeviceExtension(qubes.ext.Extension):
     def on_domain_start(self, vm, event, start_guid, **kwargs):
         for bridge in vm.devices['bridge'].assignments():
             self.on_device_pre_attached_bridge(vm, event, bridge.device, bridge.options)
+
+    @qubes.ext.handler('domain-pre-shutdown')
+    def on_domain_pre_shutdown_or_remove(self, vm, event, **kwargs):
+        attached_vms = [vm for vm in self.attached_vms(vm) if vm.is_running()]
+        if attached_vms and not kwargs.get('force', False):
+            raise qubes.exc.QubesVMError(self, 'There are bridges attached to this VM: {}'.format(
+                ', '.join(vm.name for vm in attached_vms)))
