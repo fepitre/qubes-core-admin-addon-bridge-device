@@ -25,7 +25,6 @@ import lxml
 import string
 import random
 import ipaddress
-import jinja2
 import asyncio
 
 name_re = re.compile(r"^[a-z0-9-]{1,12}$")
@@ -202,7 +201,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             if 'gateway' in options:
                 vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/gateway', options['gateway'])
 
-        vm.libvirt_domain.attachDevice(self.generate_bridge_xml(device, options))
+        vm.libvirt_domain.attachDevice(self.generate_bridge_xml(vm, device, options))
 
     @qubes.ext.handler('device-list-attached:bridge')
     def on_device_list_attached(self, vm, event, **kwargs):
@@ -260,11 +259,11 @@ class BridgeDeviceExtension(qubes.ext.Extension):
 
         for attached_device, options in self.on_device_list_attached(vm, event):
             if attached_device == device:
-                vm.libvirt_domain.detachDevice(self.generate_bridge_xml(device, options))
+                vm.libvirt_domain.detachDevice(self.generate_bridge_xml(vm, device, options))
                 break
 
     @staticmethod
-    def generate_bridge_xml(device, options):
+    def generate_bridge_xml(vm, device, options):
         options_ext = dict(options)
         if options.get('netmask', False):
             options_ext['prefix'] = get_prefix_from_netmask(options['netmask'])
@@ -285,7 +284,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             </interface>
         '''
 
-        return jinja2.Environment().from_string(bridge_xml).render(device=device, options=options_ext)
+        return vm.app.env.from_string(bridge_xml).render(device=device, options=options_ext)
 
     def attached_vms(self, vm):
         for domain in vm.app.domains:
@@ -313,6 +312,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
                     wait_count += 1
                     if wait_count > 60:
                         vm.log.error("Timeout while waiting for {} to be available".format(bridge.ident))
+                        continue
                     yield from asyncio.sleep(0.1)
 
     @qubes.ext.handler('domain-start')
