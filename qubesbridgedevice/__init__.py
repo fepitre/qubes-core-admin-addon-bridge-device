@@ -160,7 +160,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
         parsed_xml = lxml.etree.fromstring(xml)
         used = [target.get('dev', None) for target in parsed_xml.xpath("//domain/devices/interface/mac")]
 
-        # We generate arbitraly at most 32 MAC address in case of collisions
+        # We generate arbitrarily at most 32 MAC address in case of collisions
         available_macs = (rand_mac() for _ in range(32))
 
         for mac in available_macs:
@@ -321,7 +321,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             self.on_device_pre_attached_bridge(vm, event, bridge.device, bridge.options)
 
     @qubes.ext.handler('domain-pre-shutdown')
-    def on_domain_pre_shutdown_or_remove(self, vm, event, **kwargs):
+    def on_domain_pre_shutdown(self, vm, event, **kwargs):
         attached_vms = [vm for vm in self.attached_vms(vm) if vm.is_running()]
         if attached_vms and not kwargs.get('force', False):
             raise qubes.exc.QubesVMError(self, 'There are bridges attached to this VM: {}'.format(
