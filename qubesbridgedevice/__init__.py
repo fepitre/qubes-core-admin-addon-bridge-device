@@ -20,6 +20,7 @@
 """qubes-core-admin extension for handling Bridge Device"""
 
 import qubes.ext
+import qubesdb
 import re
 import lxml
 import string
@@ -31,7 +32,8 @@ name_re = re.compile(r"^[a-z0-9-]{1,12}$")
 
 
 def rand_mac():
-    return "00:16:3e:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+    return "00:16:3e:%02x:%02x:%02x" % (
+        random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
 
 def check_mac(mac):
@@ -71,14 +73,16 @@ def get_subnet(ip, netmask):
     try:
         network_conf = ipaddress.IPv4Interface(ip + '/' + netmask)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
-        raise qubes.exc.QubesValueError('Invalid ip/netmask: ' + ip + '/' + netmask)
+        raise qubes.exc.QubesValueError(
+            'Invalid ip/netmask: ' + ip + '/' + netmask)
 
     return str(network_conf.network.network_address)
 
 
 class BridgeDevice(qubes.devices.DeviceInfo):
     def __init__(self, backend_domain, ident):
-        super(BridgeDevice, self).__init__(backend_domain=backend_domain, ident=ident)
+        super(BridgeDevice, self).__init__(backend_domain=backend_domain,
+                                           ident=ident)
         self._description = None
 
     @property
@@ -87,12 +91,14 @@ class BridgeDevice(qubes.devices.DeviceInfo):
         if self._description is None:
             if not self.backend_domain.is_running():
                 return self.ident
-            safe_set = {ord(c) for c in string.ascii_letters + string.digits + '()+,-.:=_/ '}
+            safe_set = {ord(c) for c in
+                        string.ascii_letters + string.digits + '()+,-.:=_/ '}
             untrusted_desc = self.backend_domain.untrusted_qdb.read(
                 '/qubes-bridge-devices/{}/desc'.format(self.ident))
             if not untrusted_desc:
                 return ''
-            desc = ''.join((chr(c) if c in safe_set else '_') for c in untrusted_desc)
+            desc = ''.join(
+                (chr(c) if c in safe_set else '_') for c in untrusted_desc)
             self._description = desc
         return self._description
 
@@ -108,26 +114,16 @@ class BridgeDeviceExtension(qubes.ext.Extension):
         """A change in QubesDB means a change in device list"""
         vm.fire_event('device-list-change:bridge')
 
-    @staticmethod
-    def device_get(vm, ident):
-        """Read information about device from QubesDB
-
-        :param vm: backend VM object
-        :param ident: device identifier
-        :returns BridgeDevice"""
-
-        untrusted_qubes_device_attrs = vm.untrusted_qdb.list('/qubes-bridge-devices/{}/'.format(ident))
-        if not untrusted_qubes_device_attrs:
-            return None
-        return BridgeDevice(vm, ident)
-
     @qubes.ext.handler('device-list:bridge')
     def on_device_list_bridge(self, vm, event):
         if not vm.is_running():
             return
 
-        untrusted_qubes_devices = vm.untrusted_qdb.list('/qubes-bridge-devices/')
-        untrusted_idents = set(untrusted_path.split('/', 3)[2] for untrusted_path in untrusted_qubes_devices)
+        untrusted_qubes_devices = vm.untrusted_qdb.list(
+            '/qubes-bridge-devices/')
+        untrusted_idents = set(
+            untrusted_path.split('/', 3)[2] for untrusted_path in
+            untrusted_qubes_devices)
 
         for untrusted_ident in untrusted_idents:
             if not name_re.match(untrusted_ident):
@@ -150,58 +146,6 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             device_info = self.device_get(vm, ident)
             if device_info:
                 yield device_info
-
-    @staticmethod
-    def generate_unused_mac(vm):
-        """Generate unused MAC address for <mac address=.../> parameter"""
-        assert vm.is_running()
-
-        xml = vm.libvirt_domain.XMLDesc()
-        parsed_xml = lxml.etree.fromstring(xml)
-        used = [target.get('dev', None) for target in parsed_xml.xpath("//domain/devices/interface/mac")]
-
-        # We generate arbitrarily at most 32 MAC address in case of collisions
-        available_macs = (rand_mac() for _ in range(32))
-
-        for mac in available_macs:
-            if mac not in used:
-                return mac
-        return None
-
-    @qubes.ext.handler('device-pre-attach:bridge')
-    def on_device_pre_attached_bridge(self, vm, event, device, options):
-        # validate options
-        for option, value in options.items():
-            if option == 'mac':
-                if not check_mac(value):
-                    raise qubes.exc.QubesValueError('Invalid MAC address: ' + value)
-            elif option == 'ip' or option == 'netmask' or option == 'gateway':
-                if not check_ip(value):
-                    raise qubes.exc.QubesValueError('Invalid ' + option + ' address: ' + value)
-            else:
-                raise qubes.exc.QubesValueError(
-                    'Unsupported option {}'.format(option))
-
-        if not vm.is_running():
-            return
-
-        if not device.backend_domain.is_running():
-            raise qubes.exc.QubesVMNotRunningError(device.backend_domain,
-                                                   'Domain {} needs to be running to attach device from it'.format(
-                                                       device.backend_domain.name))
-
-        if 'mac' not in options:
-            options['mac'] = self.generate_unused_mac(vm)
-
-        # Write network configuration
-        if 'ip' in options and 'netmask' in options:
-            vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/ip', options['ip'])
-            vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/netmask', options['netmask'])
-
-            if 'gateway' in options:
-                vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/gateway', options['gateway'])
-
-        vm.libvirt_domain.attachDevice(self.generate_bridge_xml(vm, device, options))
 
     @qubes.ext.handler('device-list-attached:bridge')
     def on_device_list_attached(self, vm, event, **kwargs):
@@ -252,22 +196,153 @@ class BridgeDeviceExtension(qubes.ext.Extension):
 
             yield (BridgeDevice(backend_domain, ident), options)
 
+    @qubes.ext.handler('device-pre-attach:bridge')
+    def on_device_pre_attach_bridge(self, vm, event, device, options):
+        # validate options
+        for option, value in options.items():
+            if option == 'mac':
+                if not check_mac(value):
+                    raise qubes.exc.QubesValueError(
+                        'Invalid MAC address: ' + value)
+            elif option == 'ip' or option == 'netmask' or option == 'gateway':
+                if not check_ip(value):
+                    raise qubes.exc.QubesValueError(
+                        'Invalid ' + option + ' address: ' + value)
+            else:
+                raise qubes.exc.QubesValueError(
+                    'Unsupported option {}'.format(option))
+
+        if not device.backend_domain.is_running():
+            raise qubes.exc.QubesVMNotRunningError(
+                device.backend_domain,
+                'Domain {} needs to be running to attach device from it'.format(
+                    device.backend_domain.name))
+
+        if 'mac' not in options:
+            options['mac'] = self.generate_unused_mac(vm)
+
+        # When called at spawn time and not while qube is running,
+        # qubesdb is not initialised yet
+        if event != 'domain-spawn' and vm.is_running():
+            self.create_qdb_entries(vm, options)
+
+    @qubes.ext.handler('device-attach:bridge')
+    def on_device_attach_bridge(self, vm, event, device, options):
+        if not vm.is_running():
+            return
+
+        vm.libvirt_domain.attachDevice(
+            self.generate_bridge_xml(vm, device, options))
+
     @qubes.ext.handler('device-pre-detach:bridge')
-    def on_device_pre_detached_bridge(self, vm, event, device):
+    def on_device_pre_detach_bridge(self, vm, event, device):
         if not vm.is_running():
             return
 
         for attached_device, options in self.on_device_list_attached(vm, event):
             if attached_device == device:
-                vm.libvirt_domain.detachDevice(self.generate_bridge_xml(vm, device, options))
+                self.remove_qdb_entries(vm, options)
                 break
+
+    @qubes.ext.handler('device-detach:bridge')
+    def on_device_detach_bridge(self, vm, event, device):
+        if not vm.is_running():
+            return
+
+        for attached_device, options in self.on_device_list_attached(vm, event):
+            if attached_device == device:
+                vm.libvirt_domain.detachDevice(
+                    self.generate_bridge_xml(vm, device, options))
+                break
+
+    @qubes.ext.handler('domain-pre-start')
+    @asyncio.coroutine
+    def on_domain_pre_start(self, vm, event, start_guid, **kwargs):
+        for bridge in vm.devices['bridge'].assignments():
+            try:
+                backenddomain = vm.app.domains[bridge.backend_domain.name]
+            except KeyError:
+                msg = "Cannot find backend domain '%s'" \
+                      % bridge.backend_domain.name
+                vm.log.error(msg)
+
+            if backenddomain.qid != 0:
+                if not backenddomain.is_running():
+                    yield from backenddomain.start(start_guid=start_guid,
+                                                   notify_function=None)
+
+                wait_count = 0
+                vm.log.info("Waiting for {}:{} being available".format(
+                    bridge.backend_domain.name, bridge.ident))
+                while not self.device_get(backenddomain, bridge.ident):
+                    wait_count += 1
+                    if wait_count > 60:
+                        vm.log.error(
+                            "Timeout while waiting for {}"
+                            " to be available".format(bridge.ident))
+                        continue
+                    yield from asyncio.sleep(0.1)
+
+    @qubes.ext.handler('domain-spawn')
+    def on_domain_spawn(self, vm, event, start_guid, **kwargs):
+        for bridge in vm.devices['bridge'].assignments():
+            self.on_device_pre_attach_bridge(vm, event, bridge.device,
+                                               bridge.options)
+
+            self.on_device_attach_bridge(vm, event, bridge.device,
+                                               bridge.options)
+
+    @qubes.ext.handler('domain-qdb-create')
+    def on_qdb_create(self, vm, event, **kwargs):
+        for bridge in vm.devices['bridge'].assignments():
+            self.create_qdb_entries(vm, bridge.options)
+
+    @qubes.ext.handler('domain-pre-shutdown')
+    def on_domain_pre_shutdown(self, vm, event, **kwargs):
+        attached_vms = [vm for vm in self.attached_vms(vm) if vm.is_running()]
+        if attached_vms and not kwargs.get('force', False):
+            raise qubes.exc.QubesVMError(
+                self, 'There are bridges attached to this VM: {}'.format(
+                    ', '.join(vm.name for vm in
+                              attached_vms)))
+
+    @staticmethod
+    def device_get(vm, ident):
+        """Read information about device from QubesDB
+
+        :param vm: backend VM object
+        :param ident: device identifier
+        :returns BridgeDevice"""
+
+        untrusted_qubes_device_attrs = vm.untrusted_qdb.list(
+            '/qubes-bridge-devices/{}/'.format(ident))
+        if not untrusted_qubes_device_attrs:
+            return None
+        return BridgeDevice(vm, ident)
+
+    @staticmethod
+    def generate_unused_mac(vm):
+        """Generate unused MAC address for <mac address=.../> parameter"""
+        xml = vm.libvirt_domain.XMLDesc()
+        parsed_xml = lxml.etree.fromstring(xml)
+        used = [target.get('dev', None) for target in
+                parsed_xml.xpath("//domain/devices/interface/mac")]
+
+        # We generate arbitrarily at most 32 MAC address in case of collisions
+        available_macs = (rand_mac() for _ in range(32))
+
+        for mac in available_macs:
+            if mac not in used:
+                return mac
+        return None
 
     @staticmethod
     def generate_bridge_xml(vm, device, options):
         options_ext = dict(options)
         if options.get('netmask', False):
             options_ext['prefix'] = get_prefix_from_netmask(options['netmask'])
-            options_ext['subnet'] = get_subnet(options['ip'], options['netmask'])
+            options_ext['subnet'] = get_subnet(options['ip'],
+                                               options['netmask'])
 
         bridge_xml = '''
             <interface type="bridge">
@@ -284,45 +359,34 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             </interface>
         '''
 
-        return vm.app.env.from_string(bridge_xml).render(device=device, options=options_ext)
+        return vm.app.env.from_string(bridge_xml).render(device=device,
+                                                         options=options_ext)
 
     def attached_vms(self, vm):
         for domain in vm.app.domains:
-            for attached_device, options in self.on_device_list_attached(domain, event=None):
+            for attached_device, options in self.on_device_list_attached(
+                    domain, event=None):
                 if attached_device.backend_domain is vm:
                     yield domain
 
-    @qubes.ext.handler('domain-pre-start')
-    @asyncio.coroutine
-    def on_domain_pre_start(self, vm, event, start_guid, **kwargs):
-        for bridge in vm.devices['bridge'].assignments():
-            try:
-                backenddomain = vm.app.domains[bridge.backend_domain.name]
-            except KeyError:
-                msg = "Cannot find backend domain '%s'" % bridge.backend_domain.name
-                vm.log.error(msg)
+    @staticmethod
+    def create_qdb_entries(vm, options):
+        # Write network configuration
+        if 'ip' in options and 'netmask' in options:
+            vm.untrusted_qdb.write('/net-config/' + options['mac'] + '/ip',
+                                   options['ip'])
+            vm.untrusted_qdb.write(
+                '/net-config/' + options['mac'] + '/netmask',
+                options['netmask'])
 
-            if backenddomain.qid != 0:
-                if not backenddomain.is_running():
-                    yield from backenddomain.start(start_guid=start_guid, notify_function=None)
+            if 'gateway' in options:
+                vm.untrusted_qdb.write(
+                    '/net-config/' + options['mac'] + '/gateway',
+                    options['gateway'])
 
-                wait_count = 0
-                vm.log.info("Waiting for {}:{} being available".format(bridge.backend_domain.name, bridge.ident))
-                while not self.device_get(backenddomain, bridge.ident):
-                    wait_count += 1
-                    if wait_count > 60:
-                        vm.log.error("Timeout while waiting for {} to be available".format(bridge.ident))
-                        continue
-                    yield from asyncio.sleep(0.1)
-
-    @qubes.ext.handler('domain-start')
-    def on_domain_start(self, vm, event, start_guid, **kwargs):
-        for bridge in vm.devices['bridge'].assignments():
-            self.on_device_pre_attached_bridge(vm, event, bridge.device, bridge.options)
-
-    @qubes.ext.handler('domain-pre-shutdown')
-    def on_domain_pre_shutdown(self, vm, event, **kwargs):
-        attached_vms = [vm for vm in self.attached_vms(vm) if vm.is_running()]
-        if attached_vms and not kwargs.get('force', False):
-            raise qubes.exc.QubesVMError(self, 'There are bridges attached to this VM: {}'.format(
-                ', '.join(vm.name for vm in attached_vms)))
+    @staticmethod
+    def remove_qdb_entries(vm, options):
+        # Remove network configuration
+        vm.untrusted_qdb.rm('/net-config/' + options['mac'] + '/ip')
+        vm.untrusted_qdb.rm('/net-config/' + options['mac'] + '/netmask')
+        vm.untrusted_qdb.rm('/net-config/' + options['mac'] + '/gateway')
