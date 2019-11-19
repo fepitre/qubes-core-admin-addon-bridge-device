@@ -80,6 +80,7 @@ def get_subnet(ip, netmask):
 
 
 class BridgeDevice(qubes.devices.DeviceInfo):
+    # pylint: disable=too-few-public-methods
     def __init__(self, backend_domain, ident):
         super(BridgeDevice, self).__init__(backend_domain=backend_domain,
                                            ident=ident)
@@ -104,6 +105,7 @@ class BridgeDevice(qubes.devices.DeviceInfo):
 
 
 class BridgeDeviceExtension(qubes.ext.Extension):
+    # pylint: disable=unused-argument,no-self-use,unused-variable
     @qubes.ext.handler('domain-init', 'domain-load')
     def on_domain_init_load(self, vm, event):
         """Initialize watching for changes"""
@@ -204,7 +206,7 @@ class BridgeDeviceExtension(qubes.ext.Extension):
                 if not check_mac(value):
                     raise qubes.exc.QubesValueError(
                         'Invalid MAC address: ' + value)
-            elif option == 'ip' or option == 'netmask' or option == 'gateway':
+            elif option in ('ip', 'netmask', 'gateway'):
                 if not check_ip(value):
                     raise qubes.exc.QubesValueError(
                         'Invalid ' + option + ' address: ' + value)
@@ -287,10 +289,10 @@ class BridgeDeviceExtension(qubes.ext.Extension):
     def on_domain_spawn(self, vm, event, start_guid, **kwargs):
         for bridge in vm.devices['bridge'].assignments():
             self.on_device_pre_attach_bridge(vm, event, bridge.device,
-                                               bridge.options)
+                                             bridge.options)
 
             self.on_device_attach_bridge(vm, event, bridge.device,
-                                               bridge.options)
+                                         bridge.options)
 
     @qubes.ext.handler('domain-qdb-create')
     def on_qdb_create(self, vm, event, **kwargs):
