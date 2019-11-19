@@ -299,7 +299,8 @@ class BridgeDeviceExtension(qubes.ext.Extension):
 
     @qubes.ext.handler('domain-pre-shutdown')
     def on_domain_pre_shutdown(self, vm, event, **kwargs):
-        attached_vms = [vm for vm in self.attached_vms(vm) if vm.is_running()]
+        attached_vms = [domain for domain in self.attached_vms(vm)
+                        if vm.is_running()]
         if attached_vms and not kwargs.get('force', False):
             raise qubes.exc.QubesVMError(
                 self, 'There are bridges attached to this VM: {}'.format(
