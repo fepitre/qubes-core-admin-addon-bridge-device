@@ -1,5 +1,5 @@
 sudo: required
-dist: trusty
+dist: bionic
 language: python
 python: '3.5'
 install: 
@@ -9,7 +9,7 @@ env:
  - DIST_DOM0=fc25 USE_QUBES_REPO_VERSION=4.0 USE_QUBES_REPO_TESTING=1
 
 script:
- - PYTHONPATH=test-packages python3 -m pylint qubes_bridge_device
+ - PYTHONPATH=test-packages python3 -m pylint qubesbridgedevice
  - ~/qubes-builder/scripts/travis-build
 
 branches:
