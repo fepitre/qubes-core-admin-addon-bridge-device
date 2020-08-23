@@ -163,7 +163,11 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             backend_domain_node = iface.find('backenddomain')
             if backend_domain_node is None:
                 continue
-            backend_domain = vm.app.domains[backend_domain_node.get('name')]
+
+            dom_name = backend_domain_node.get('name')
+            if dom_name == 'Domain-0':
+                dom_name = 'dom0'
+            backend_domain = vm.app.domains[dom_name]
 
             bridge_name_node = iface.find('source')
             if bridge_name_node is None:
@@ -351,7 +355,9 @@ class BridgeDeviceExtension(qubes.ext.Extension):
             <interface type="bridge">
                 <source bridge="{{device.ident}}" />
                 <mac address="{{options.get('mac')}}" />
+                {%- if device.backend_domain.name != 'dom0' %}
                 <backenddomain name="{{device.backend_domain.name}}" />
+                {%- endif %}
                 <script path="vif-bridge" />
                 {%- if options.get('ip') and options.get('prefix') %}
                 <ip address="{{options.get('ip')}}" prefix="{{options.get('prefix')}}" />
