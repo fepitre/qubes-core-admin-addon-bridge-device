@@ -1,6 +1,6 @@
 checks:pylint:
   before_script:
-  - dnf install -y pylint python3-qubesadmin python3-qubesdb
+  - sudo dnf install -y pylint
   script:
   - PYTHONPATH=test-packages python3 -m pylint qubesbridgedevice
   stage: checks
