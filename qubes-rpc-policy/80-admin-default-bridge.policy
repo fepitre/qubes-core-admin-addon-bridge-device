@@ -1,0 +1,8 @@
+## Do not modify this file, create a new policy file with a lower number in the
+## filename instead. For example `30-bridge.policy`.
+
+!include-service admin.vm.device.bridge.Attach * include/admin-local-rwx
+!include-service admin.vm.device.bridge.Available * include/admin-local-ro
+!include-service admin.vm.device.bridge.Detach * include/admin-local-rwx
+!include-service admin.vm.device.bridge.List * include/admin-local-ro
+!include-service admin.vm.device.bridge.Set.persistent * include/admin-local-rwx

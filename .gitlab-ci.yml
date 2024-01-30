@@ -1,0 +1,11 @@
+checks:pylint:
+  before_script:
+  - dnf install -y pylint python3-qubesadmin python3-qubesdb
+  script:
+  - PYTHONPATH=test-packages python3 -m pylint qubesbridgedevice
+  stage: checks
+include:
+- file: /r4.2/gitlab-base.yml
+  project: QubesOS/qubes-continuous-integration
+- file: /r4.2/gitlab-host.yml
+  project: QubesOS/qubes-continuous-integration

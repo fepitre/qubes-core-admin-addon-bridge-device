@@ -9,7 +9,9 @@ URL:		https://www.qubes-os.org
 Source0:    %{name}-%{version}.tar.gz
 
 BuildArch:	noarch
+BuildRequires:	make
 BuildRequires:	python%{python3_pkgversion}-devel
+BuildRequires:	python%{python3_pkgversion}-setuptools
 
 %description
 qubes-core-admin extension for handling Bridge Device
@@ -28,9 +30,9 @@ make %{?_smp_mflags}
 %{python3_sitelib}/qubesbridgedevice-*.egg-info
 %{python3_sitelib}/qubesbridgedevice
 
-%attr(2775,root,qubes) %dir /etc/qubes-rpc/policy
-%attr(0664,root,qubes) %config(noreplace) /etc/qubes-rpc/policy/admin.*
-/etc/qubes-rpc/admin.*
+%attr(2775,root,qubes) %dir /etc/qubes/policy.d/
+%attr(0664,root,qubes) %config(noreplace) /etc/qubes/policy.d/80-admin-default-bridge.policy
+/etc/qubes/policy.d/80-admin-default-bridge.policy
 
 %changelog
-
+@CHANGELOG@
