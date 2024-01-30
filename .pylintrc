@@ -11,6 +11,8 @@ disable=
   duplicate-code,
   fixme,
   locally-disabled,
+  missing-function-docstring,
+  missing-class-docstring
 
 [REPORTS]
 
