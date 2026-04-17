@@ -1,36 +1,89 @@
-Name:		qubes-core-admin-bridge-device
-Version:	@VERSION@
-Release:	1%{?dist}
-Summary:	qubes-core-admin extension for handling Bridge Device
+Name:           qubes-core-admin-addon-bridge-device
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Qubes Admin API extension for bridge network devices
 
-Group:		Qubes
-License:	GPLv2+
-URL:		https://www.qubes-os.org
-Source0:    %{name}-%{version}.tar.gz
+Group:          Qubes
+License:        GPLv2+
+URL:            https://www.qubes-os.org
+Source0:        %{name}-%{version}.tar.gz
 
-BuildArch:	noarch
-BuildRequires:	python%{python3_pkgversion}-devel
+BuildArch:      noarch
+
+# Prevent incorrect auto-generated /usr/bin/python dependency from shebangs
+AutoReq:        no
+
+BuildRequires:  make
+BuildRequires:  python%{python3_pkgversion}-devel
+BuildRequires:  python%{python3_pkgversion}-setuptools
+
+Requires:       qubes-core-dom0
+Requires:       python%{python3_pkgversion}
+Requires:       python%{python3_pkgversion}-lxml
+Requires:       python%{python3_pkgversion}-jinja2
+Requires:       python%{python3_pkgversion}-qubesdb
+
 
 %description
-qubes-core-admin extension for handling Bridge Device
+A qubes-core-admin extension that registers bridge network interfaces as
+first-class Qubes devices under the "bridge" device class.  It allows
+bridge interfaces exposed by a backend domain to be attached, assigned
+(persistently), or auto-attached to frontend qubes via the standard
+Admin API (admin.vm.device.bridge.*).
+
+Features:
+- Discovers bridges via QubesDB (/qubes-bridge-devices/*)
+- Supports per-attachment options: mac, ip, netmask, gateway
+- Automatically starts the backend domain when a required bridge is assigned
+- Writes /net-config/<mac>/* QubesDB keys consumed by guest networking
+
 
 %prep
 %setup -q
 
+
 %build
 make %{?_smp_mflags}
 
+
 %install
-%make_install
+make install DESTDIR=$RPM_BUILD_ROOT
+
+
+%posttrans
+# Preserve any user-modified legacy per-service policy files that RPM
+# renamed to *.rpmsave on upgrade. Must run in %%posttrans so the old
+# package has already been removed.
+for service in \
+    admin.vm.device.bridge.Assign \
+    admin.vm.device.bridge.Assigned \
+    admin.vm.device.bridge.Attach \
+    admin.vm.device.bridge.Attached \
+    admin.vm.device.bridge.Available \
+    admin.vm.device.bridge.Detach \
+    admin.vm.device.bridge.Set.assignment \
+    admin.vm.device.bridge.Unassign; do
+    if [ -f "/etc/qubes-rpc/policy/$service.rpmsave" ] && \
+            ! [ -e "/etc/qubes-rpc/policy/$service" ]; then
+        mv -n "/etc/qubes-rpc/policy/$service.rpmsave" \
+            "/etc/qubes-rpc/policy/$service"
+    fi
+done
+
 
 %files
 %doc README.md
-%{python3_sitelib}/qubesbridgedevice-*.egg-info
-%{python3_sitelib}/qubesbridgedevice
+%config(noreplace) %attr(0664,root,qubes) /etc/qubes/policy.d/90-admin-bridge-device.policy
+/etc/qubes-rpc/admin.vm.device.bridge.Assign
+/etc/qubes-rpc/admin.vm.device.bridge.Assigned
+/etc/qubes-rpc/admin.vm.device.bridge.Attach
+/etc/qubes-rpc/admin.vm.device.bridge.Attached
+/etc/qubes-rpc/admin.vm.device.bridge.Available
+/etc/qubes-rpc/admin.vm.device.bridge.Detach
+/etc/qubes-rpc/admin.vm.device.bridge.Set.assignment
+/etc/qubes-rpc/admin.vm.device.bridge.Unassign
+%{python3_sitelib}/qubesbridgedevice/
+%{python3_sitelib}/qubesbridgedevice-*.egg-info/
 
-%attr(2775,root,qubes) %dir /etc/qubes-rpc/policy
-%attr(0664,root,qubes) %config(noreplace) /etc/qubes-rpc/policy/admin.*
-/etc/qubes-rpc/admin.*
 
 %changelog
-

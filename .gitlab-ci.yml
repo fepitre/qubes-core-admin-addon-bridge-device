@@ -1,0 +1,75 @@
+include:
+  - file: /common.yml
+    project: QubesOS/qubes-continuous-integration
+  - project: 'QubesOS/qubes-continuous-integration'
+    file: '/r4.3/gitlab-base.yml'
+  - project: 'QubesOS/qubes-continuous-integration'
+    file: '/r4.3/gitlab-host.yml'
+
+lint:
+  extends: .lint
+  stage: checks
+  variables:
+    DIR: qubesbridgedevice
+
+mypy:
+  image: fedora:latest
+  stage: checks
+  tags:
+    - docker
+  before_script:
+    - sudo dnf install -y python3-mypy python3-pip
+  script:
+    - mypy --install-types --non-interactive --ignore-missing-imports --junit-xml mypy.xml qubesbridgedevice
+  artifacts:
+    reports:
+      junit: mypy.xml
+
+vulture:
+  image: fedora:latest
+  stage: checks
+  tags:
+    - docker
+  before_script:
+    - sudo dnf install -y vulture
+  script:
+    - vulture qubesbridgedevice --min-confidence 80 --ignore-names path
+
+.bridge-device-integration:
+  stage: checks
+  tags:
+    - vm-kvm
+  variables:
+    TESTBED_REPO: https://github.com/fepitre/qubes-bridge-device-tests.git
+    TESTBED_DIR: /tmp/bridge-device-tests
+    AGENT_SRC: /tmp/bridge-device-agent
+    AGENT_REPO_URL: ""
+    AGENT_BRANCH: ""
+  before_script:
+    - sudo qubes-dom0-update -y ansible qubes-ansible-dom0
+    - sudo qvm-run --pass-io -u root "$(qvm-prefs default-mgmt-dvm template)" "dnf install -y qubes-ansible qubes-ansible-vm"
+    - sudo qvm-shutdown --wait "$(qvm-prefs default-mgmt-dvm template)"
+  script:
+    - git clone --depth 1 "$TESTBED_REPO" "$TESTBED_DIR"
+    - |
+      AGENT_REPO="${AGENT_REPO_URL:-$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/qubes-core-agent-linux-addon-bridge-device.git}"
+      AGENT_REF="${AGENT_BRANCH:-$CI_COMMIT_BRANCH}"
+      git clone --branch "$AGENT_REF" --depth 1 "$AGENT_REPO" "$AGENT_SRC"
+    - cd "$TESTBED_DIR"
+    - >
+      ansible-playbook playbooks/main.yml
+      -e core_admin_src="$CI_PROJECT_DIR"
+      -e core_agent_src="$AGENT_SRC"
+    - >
+      ansible-playbook playbooks/deploy.yml
+      -e core_admin_src="$CI_PROJECT_DIR"
+      -e core_agent_src="$AGENT_SRC"
+    - >
+      ansible-playbook playbooks/tests.yml
+      -e core_admin_src="$CI_PROJECT_DIR"
+      -e core_agent_src="$AGENT_SRC"
+
+r4.3:bridge-device-integration:
+  extends: .bridge-device-integration
+  variables:
+    VM_IMAGE: qubes_4.3_64bit_stable.qcow2

@@ -1,0 +1,15 @@
+## Do not modify this file, create a new policy file with a lower number in the
+## filename instead. For example `30-admin-bridge-user.policy`.
+
+###
+### Admin API qrexec policy for qubes-core-admin-addon-bridge-device
+###
+
+!include-service admin.vm.device.bridge.Available    * include/admin-local-ro
+!include-service admin.vm.device.bridge.Assigned     * include/admin-local-ro
+!include-service admin.vm.device.bridge.Attached     * include/admin-local-ro
+!include-service admin.vm.device.bridge.Assign       * include/admin-local-rwx
+!include-service admin.vm.device.bridge.Unassign     * include/admin-local-rwx
+!include-service admin.vm.device.bridge.Attach       * include/admin-local-rwx
+!include-service admin.vm.device.bridge.Detach       * include/admin-local-rwx
+!include-service admin.vm.device.bridge.Set.assignment * include/admin-local-rwx

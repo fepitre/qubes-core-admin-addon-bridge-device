@@ -6,12 +6,16 @@ if __name__ == '__main__':
     setuptools.setup(
         name='qubesbridgedevice',
         version=open('version').read().strip(),
-        author='QubesOS',
+        author='Qubes OS Project',
         author_email='frederic.pierret@qubes-os.org',
-        description='Qubes Bridge Device core-admin extension',
+        description='Qubes Admin API extension for bridge network devices',
         license='GPL2+',
         url='https://www.qubes-os.org/',
         packages=('qubesbridgedevice',),
+        install_requires=[
+            'lxml',
+            'jinja2',
+        ],
         entry_points={
             'qubes.ext': [
                 'qubesbridgedevice = qubesbridgedevice:BridgeDeviceExtension',
