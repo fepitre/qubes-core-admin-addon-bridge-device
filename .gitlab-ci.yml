@@ -43,8 +43,8 @@ vulture:
     TESTBED_REPO: https://github.com/fepitre/qubes-bridge-device-tests.git
     TESTBED_DIR: /tmp/bridge-device-tests
     AGENT_SRC: /tmp/bridge-device-agent
-    AGENT_REPO_URL: ""
-    AGENT_BRANCH: ""
+    AGENT_REPO_URL: "https://github.com/fepitre/qubes-core-agent-linux-addon-bridge-device.git"
+    AGENT_BRANCH: "devel20260416"
   before_script:
     - sudo qubes-dom0-update -y ansible qubes-ansible-dom0
     - sudo qvm-run --pass-io -u root "$(qvm-prefs default-mgmt-dvm template)" "dnf install -y qubes-ansible qubes-ansible-vm"
